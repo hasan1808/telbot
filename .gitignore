@@ -13,9 +13,4 @@ out.log
 restart.flag
 restart.ps1
 run.bat
-admin.json
 instagram_login.json
-config.json
-short_urls.json
-limits.json
-users.json
