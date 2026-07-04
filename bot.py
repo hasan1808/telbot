@@ -22,23 +22,28 @@ from telegram.ext import (
     filters,
 )
 
+import jdatetime
+import hijridate
+
 # ─── Config ───────────────────────────────────────────────────────────────
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
-ADMIN_FILE = Path(__file__).parent / "admin.json"
-USERS_FILE = Path(__file__).parent / "users.json"
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8648205951:AAG0x6GDqAgDaZXPBHDnX1XvdTuJ8i8ltik")
+DATA_DIR = Path(__file__).parent / "data"
+ADMIN_FILE = DATA_DIR / "admin.json"
+USERS_FILE = DATA_DIR / "users.json"
 DOWNLOAD_DIR = Path(__file__).parent / "downloads"
-MAX_TG_FILE = 2 * 1024 * 1024 * 1024  # 2GB limit - always provide direct link
+MAX_TG_FILE = 11 * 1024 * 1024 * 1024  # 11GB limit for direct link
 MAX_TELEGRAM_UPLOAD = 50 * 1024 * 1024  # 50MB for sending via Telegram
 CLEANUP_INTERVAL = 300  # cleanup every 5 minutes
 HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
 SERVER_BASE_URL = os.environ.get("SERVER_BASE_URL", "")
-IG_SESSION_FILE = Path(__file__).parent / "instagram_session"
-IG_LOGIN_FILE = Path(__file__).parent / "instagram_login.json"
-LIMITS_FILE = Path(__file__).parent / "limits.json"
-CONFIG_FILE = Path(__file__).parent / "config.json"
-SHORT_URLS_FILE = Path(__file__).parent / "short_urls.json"
+IG_SESSION_FILE = DATA_DIR / "instagram_session"
+IG_LOGIN_FILE = DATA_DIR / "instagram_login.json"
+LIMITS_FILE = DATA_DIR / "limits.json"
+CONFIG_FILE = DATA_DIR / "config.json"
+SHORT_URLS_FILE = DATA_DIR / "short_urls.json"
 
 DOWNLOAD_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
 
 
 def load_limits():
@@ -415,13 +420,92 @@ def save_user_ids(users):
 def is_admin(uid):
     return uid in load_admins()
 
+
+# ─── Calendar converter helpers ─────────────────────────────────────────
+def shamsi_to_miladi(year, month, day):
+    d = jdatetime.date(year, month, day)
+    g = d.togregorian()
+    return g.year, g.month, g.day
+
+def miladi_to_shamsi(year, month, day):
+    d = jdatetime.date.fromgregorian(year=year, month=month, day=day)
+    return d.year, d.month, d.day
+
+def shamsi_to_ghamari(year, month, day):
+    g = jdatetime.date(year, month, day).togregorian()
+    h = hijridate.Gregorian(g.year, g.month, g.day).to_hijri()
+    return h.year, h.month, h.day
+
+def ghamari_to_shamsi(year, month, day):
+    g = hijridate.Hijri(year, month, day).to_gregorian()
+    d = jdatetime.date.fromgregorian(year=g.year, month=g.month, day=g.day)
+    return d.year, d.month, d.day
+
+
+# ─── Currency rate helpers ──────────────────────────────────────────────
+def fetch_tgju_rates():
+    import urllib.request
+    from bs4 import BeautifulSoup
+    try:
+        req = urllib.request.Request("https://www.tgju.org/", headers={"User-Agent": "Mozilla/5.0"})
+        r = urllib.request.urlopen(req, timeout=15)
+        soup = BeautifulSoup(r.read().decode("utf-8"), "lxml")
+        data = {}
+
+        for table in soup.find_all("table"):
+            for row in table.find_all("tr"):
+                th = row.find("th")
+                price_td = row.find("td", class_="nf")
+                if th and price_td:
+                    name = th.get_text(strip=True)
+                    price_text = price_td.get_text(strip=True).replace(",", "").replace("\u066c", "").strip()
+                    try:
+                        data[name] = float(price_text)
+                    except:
+                        pass
+
+        for tr in soup.find_all("tr"):
+            th = tr.find("th")
+            if not th:
+                continue
+            name = th.get_text(strip=True)
+            if name in data:
+                continue
+            for td in tr.find_all("td"):
+                price_text = td.get_text(strip=True).replace(",", "").replace("\u066c", "").strip()
+                if price_text and price_text[0].isdigit():
+                    try:
+                        price = float(price_text)
+                        if 100 < price < 1e12:
+                            data[name] = price
+                            break
+                    except:
+                        pass
+
+        return data
+    except:
+        return None
+
+def fetch_trx_rate(usd_irr):
+    """Fetch TRX price in IRR using jsdelivr API."""
+    import urllib.request, json
+    try:
+        r = urllib.request.urlopen("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json", timeout=8)
+        c = json.loads(r.read())["usd"]
+        trx_per_usd = c.get("trx", 0)
+        if trx_per_usd and usd_irr:
+            return int(usd_irr / trx_per_usd)
+    except:
+        pass
+    return None
+
+
 # ─── Keyboards ───────────────────────────────────────────────────────────
 def main_menu(uid=None):
     keyboard = [
         [InlineKeyboardButton("🎬  دانلود ویدیو  🎬", callback_data="section_download")],
         [InlineKeyboardButton("📱  اطلاعات گوشی  📱", callback_data="section_gsm")],
         [InlineKeyboardButton("🧰  ابزارها  🧰", callback_data="section_tools")],
-        [InlineKeyboardButton("🖼  ویرایش عکس  🖼", callback_data="section_photoedit")],
         [InlineKeyboardButton("📦  آپلود فایل و لینک مستقیم  📦", callback_data="section_filehost")],
     ]
     if uid and is_admin(uid):
@@ -729,13 +813,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
         context.user_data["awaiting_file_upload"] = True
-        await safe_edit(query, 
-            "📁 **آپلود فایل و دریافت لینک دانلود**\n\n"
-            "فایل رو بفرست (تا ۵۰ مگ از طریق تلگرام).\n"
-            "بعد از آپلود، لینک دانلود مستقیم بهت می‌دم.",
+        text = "📁 **آپلود فایل و دریافت لینک دانلود**\n\nفایل رو بفرست (تا ۵۰ مگ از طریق تلگرام).\nبعد از آپلود، لینک دانلود مستقیم بهت می‌دم."
+        kb = [[InlineKeyboardButton("🔙 برگشت", callback_data="back_main")]]
+        if is_admin(uid):
+            text += "\n\n🔹 ادمین: می‌تونی لینک دانلود هم بفرستی (تا ۱۱ گیگ)."
+            kb.insert(0, [InlineKeyboardButton("📥 دانلود از لینک", callback_data="admin_dl_from_url")])
+        await safe_edit(query, text, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(kb))
+
+    elif data == "admin_dl_from_url":
+        context.user_data["awaiting_admin_dl"] = True
+        await safe_edit(query,
+            "📥 **دانلود از لینک (ادمین)**\n\n"
+            "لینک مستقیم فایل رو بفرست.\n"
+            "ربات دانلود می‌کنه و لینک مستقیم بهت میده.\n"
+            "📦 حداکثر حجم: ۱۱ گیگابایت",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="back_main")]])
-        )
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_filehost")]]))
 
     elif data == "section_gsm":
         keyboard = [
@@ -756,7 +850,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "مثال: `Samsung Galaxy S24`\n"
             "یا: `SM-S928B`",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_gsm")]]))
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_gsm")]])
         )
 
     elif data == "section_settings":
@@ -1273,7 +1367,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("✨ افزایش کیفیت", callback_data="photo_upscale")],
             [InlineKeyboardButton("🎨 حذف بکگراند", callback_data="photo_removebg")],
-            [InlineKeyboardButton("🔙 برگشت", callback_data="back_main")],
+            [InlineKeyboardButton("🔙 برگشت", callback_data="section_tools")],
         ]
         await safe_edit(query,
             "🖼 **ویرایش عکس**\n\n"
@@ -1301,9 +1395,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Tools section ──
     elif data == "section_tools":
         keyboard = [
+            [InlineKeyboardButton("🖼 ویرایش عکس", callback_data="section_photoedit")],
             [InlineKeyboardButton("🔄 تبدیل رسانه", callback_data="tools_convert")],
             [InlineKeyboardButton("📱 QR کد", callback_data="tools_qr")],
             [InlineKeyboardButton("🔗 کوتاه‌کننده لینک", callback_data="tools_shorten")],
+            [InlineKeyboardButton("📅 تبدیل تاریخ", callback_data="tools_calendar")],
+            [InlineKeyboardButton("💰 نرخ ارز و طلا", callback_data="tools_currency")],
             [InlineKeyboardButton("🔙 برگشت", callback_data="back_main")],
         ]
         await safe_edit(query,
@@ -1366,6 +1463,115 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_tools")]]))
 
+    # ── Calendar converter ──
+    elif data == "tools_calendar":
+        keyboard = [
+            [InlineKeyboardButton("📅 شمسی به میلادی", callback_data="cal_shamsi_to_miladi")],
+            [InlineKeyboardButton("📅 میلادی به شمسی", callback_data="cal_miladi_to_shamsi")],
+            [InlineKeyboardButton("📅 شمسی به قمری", callback_data="cal_shamsi_to_ghamari")],
+            [InlineKeyboardButton("📅 قمری به شمسی", callback_data="cal_ghamari_to_shamsi")],
+            [InlineKeyboardButton("🔙 برگشت", callback_data="section_tools")],
+        ]
+        await safe_edit(query,
+            "📅 **تبدیل تاریخ**\n\n"
+            "نوع تبدیل را انتخاب کنید:",
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data == "cal_shamsi_to_miladi":
+        context.user_data["awaiting_calendar"] = ("shamsi_to_miladi", "1403/01/21")
+        await safe_edit(query,
+            "📅 **شمسی به میلادی**\n\n"
+            "تاریخ شمسی را به فرمت `سال/ماه/روز` وارد کنید.\n"
+            "مثال: `1403/01/21`",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_calendar")]]))
+
+    elif data == "cal_miladi_to_shamsi":
+        context.user_data["awaiting_calendar"] = ("miladi_to_shamsi", "2024/04/09")
+        await safe_edit(query,
+            "📅 **میلادی به شمسی**\n\n"
+            "تاریخ میلادی را به فرمت `سال/ماه/روز` وارد کنید.\n"
+            "مثال: `2024/04/09`",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_calendar")]]))
+
+    elif data == "cal_shamsi_to_ghamari":
+        context.user_data["awaiting_calendar"] = ("shamsi_to_ghamari", "1403/01/21")
+        await safe_edit(query,
+            "📅 **شمسی به قمری**\n\n"
+            "تاریخ شمسی را به فرمت `سال/ماه/روز` وارد کنید.\n"
+            "مثال: `1403/01/21`",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_calendar")]]))
+
+    elif data == "cal_ghamari_to_shamsi":
+        context.user_data["awaiting_calendar"] = ("ghamari_to_shamsi", "1446/10/06")
+        await safe_edit(query,
+            "📅 **قمری به شمسی**\n\n"
+            "تاریخ قمری را به فرمت `سال/ماه/روز` وارد کنید.\n"
+            "مثال: `1446/10/06`",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_calendar")]]))
+
+    # ── Currency rates ──
+    elif data == "tools_currency":
+        await safe_edit(query, "⏳ در حال دریافت نرخ ارز و طلا از tgju...")
+        tgju = await asyncio.to_thread(fetch_tgju_rates)
+        if tgju:
+            usd = tgju.get("دلار", 0)
+            eur = tgju.get("یورو", 0) or tgju.get("EUR/USD", 0) and int(usd * 1.14) or 0
+            gbp = tgju.get("پوند انگلیس", 0)
+            aed = tgju.get("درهم امارات", 0)
+            try_l = tgju.get("لیر ترکیه", 0)
+            gold_usd = tgju.get("انس طلا", 0)
+            gold_18 = tgju.get("طلای 18 عیار", 0)
+            gold_mesghal = tgju.get("مثقال طلا", 0)
+            coin_emami = tgju.get("سکه امامی", 0)
+            coin_bahar = tgju.get("سکه بهار آزادی", 0)
+            btc = tgju.get("بیت کوین", 0)
+            tether = tgju.get("تتر", 0)
+
+            lines = ["💰 **نرخ ارز و طلا**\n"]
+            if usd:
+                lines.append(f"💵 دلار (USD): `{int(usd):,}` ریال")
+            if eur:
+                lines.append(f"💶 یورو (EUR): `{int(eur):,}` ریال")
+            if gbp:
+                lines.append(f"💷 پوند (GBP): `{int(gbp):,}` ریال")
+            if aed:
+                lines.append(f"🇦🇪 درهم (AED): `{int(aed):,}` ریال")
+            if try_l:
+                lines.append(f"🇹🇷 لیر (TRY): `{int(try_l):,}` ریال")
+            if tether:
+                lines.append(f"🪙 تتر (USDT): `{int(tether):,}` ریال")
+            if usd:
+                trx = await asyncio.to_thread(fetch_trx_rate, usd)
+                if trx:
+                    lines.append(f"⚡ ترون (TRX): `{int(trx):,}` ریال")
+
+            lines.append("")
+            if gold_18:
+                lines.append(f"🥇 طلای ۱۸ عیار: `{int(gold_18):,}` ریال")
+            if gold_mesghal:
+                lines.append(f"🥇 مثقال طلا: `{int(gold_mesghal):,}` ریال")
+            if gold_usd:
+                lines.append(f"🌍 انس طلا: `${gold_usd:,.2f}`")
+            if coin_emami:
+                lines.append(f"🪙 سکه امامی: `{int(coin_emami):,}` ریال")
+            if coin_bahar:
+                lines.append(f"🪙 سکه بهار آزادی: `{int(coin_bahar):,}` ریال")
+            if btc:
+                lines.append(f"₿ بیت‌کوین: `${btc:,.2f}`")
+
+            lines.append(f"\n📅 {time.strftime('%Y-%m-%d %H:%M')}")
+            lines.append("منبع: tgju.org")
+            text = "\n".join(lines)
+        else:
+            text = "❌ خطا در دریافت نرخ‌ها از tgju.org"
+        await safe_edit(query, text, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔄 تازه‌سازی", callback_data="tools_currency"),
+                                                  InlineKeyboardButton("🔙 برگشت", callback_data="section_tools")]]))
+
     elif data == "gsm_by_photo":
         context.user_data["awaiting_gsm_photo"] = True
         await safe_edit(query,
@@ -1377,27 +1583,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Image conversion format selection
     elif data.startswith("conv_img_"):
-        parts = data.split("_", 3)
-        if len(parts) >= 4:
-            fmt = parts[2].upper()
-            input_path = Path(parts[3])
-            output_path = input_path.with_suffix(f".{fmt.lower()}")
+        fmt = data.split("_")[2].upper()
+        input_path = context.user_data.get("awaiting_convert_file")
+        if not input_path:
+            await safe_edit(query, "❌ فایل یافت نشد. دوباره عکس را ارسال کنید.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_convert")]]))
+            return
+        input_path = Path(input_path)
+        output_path = input_path.with_suffix(f".{fmt.lower()}")
+        try:
+            await safe_edit(query, f"⏳ در حال تبدیل به {fmt}...")
+            await asyncio.to_thread(convert_image_format, str(input_path), str(output_path), fmt)
+            with open(output_path, "rb") as f:
+                await query.message.reply_document(
+                    document=f, filename=f"converted.{fmt.lower()}",
+                    caption=f"✅ تبدیل به {fmt} انجام شد.",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_convert")]])
+                )
+            await query.message.delete()
             try:
-                await safe_edit(query, f"⏳ در حال تبدیل به {fmt}...")
-                await asyncio.to_thread(convert_image_format, str(input_path), str(output_path), fmt)
-                with open(output_path, "rb") as f:
-                    await query.message.reply_document(
-                        document=f, filename=f"converted.{fmt.lower()}",
-                        caption=f"✅ تبدیل به {fmt} انجام شد.",
-                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_convert")]])
-                    )
-                await query.message.delete()
-                try:
-                    input_path.unlink()
-                    output_path.unlink()
-                except: pass
-            except Exception as e:
-                await safe_edit(query, f"❌ خطا:\n`{str(e)[:200]}`", parse_mode="Markdown")
+                input_path.unlink()
+                output_path.unlink()
+            except: pass
+        except Exception as e:
+            await safe_edit(query, f"❌ خطا:\n`{str(e)[:200]}`", parse_mode="Markdown")
 
 # ─── Download handler ───────────────────────────────────────────────────
 COOKIES_FILE = Path(__file__).parent / "cookies.txt"
@@ -1701,6 +1909,78 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_gsm")]])
             )
+        return
+
+    # ── Calendar converter ──
+    cal_mode = context.user_data.get("awaiting_calendar")
+    if cal_mode:
+        context.user_data["awaiting_calendar"] = None
+        mode, example = cal_mode
+        try:
+            parts = text.strip().split("/")
+            if len(parts) != 3:
+                raise ValueError
+            y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+            if mode == "shamsi_to_miladi":
+                gy, gm, gd = shamsi_to_miladi(y, m, d)
+                result = f"📅 **شمسی به میلادی**\n\n{y}/{m:02d}/{d:02d} ← {gy}/{gm:02d}/{gd:02d}"
+            elif mode == "miladi_to_shamsi":
+                sy, sm, sd = miladi_to_shamsi(y, m, d)
+                result = f"📅 **میلادی به شمسی**\n\n{y}/{m:02d}/{d:02d} ← {sy}/{sm:02d}/{sd:02d}"
+            elif mode == "shamsi_to_ghamari":
+                hy, hm, hd = shamsi_to_ghamari(y, m, d)
+                result = f"📅 **شمسی به قمری**\n\n{y}/{m:02d}/{d:02d} ← {hy}/{hm:02d}/{hd:02d}"
+            else:
+                sy, sm, sd = ghamari_to_shamsi(y, m, d)
+                result = f"📅 **قمری به شمسی**\n\n{y}/{m:02d}/{d:02d} ← {sy}/{sm:02d}/{sd:02d}"
+        except:
+            result = f"❌ فرمت تاریخ نامعتبر.\nلطفاً به فرمت `سال/ماه/روز` وارد کنید.\nمثال: `{example}`"
+        await update.message.reply_text(result, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="tools_calendar")]]))
+        return
+
+    # ── Admin URL download ──
+    if context.user_data.get("awaiting_admin_dl"):
+        context.user_data["awaiting_admin_dl"] = False
+        url = text.strip()
+        if not url.startswith("http://") and not url.startswith("https://"):
+            await update.message.reply_text("❗ لطفاً یک لینک معتبر با `http://` یا `https://` وارد کنید.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_filehost")]]))
+            return
+        msg = await update.message.reply_text("⏳ در حال دانلود...")
+        try:
+            dl_dir = DOWNLOAD_DIR / "admin_dl" / str(uid)
+            dl_dir.mkdir(parents=True, exist_ok=True)
+            import urllib.request
+            file_name = url.split("/")[-1].split("?")[0] or f"file_{int(time.time())}"
+            file_path = dl_dir / file_name
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=300) as r:
+                total = int(r.headers.get("Content-Length", 0))
+                if total > MAX_TG_FILE:
+                    await msg.edit_text(f"❌ حجم فایل بیشتر از ۱۱ گیگابایت است.")
+                    return
+                with open(file_path, "wb") as f:
+                    shutil.copyfileobj(r, f)
+            file_size = file_path.stat().st_size
+            if file_size > MAX_TG_FILE:
+                file_path.unlink()
+                await msg.edit_text(f"❌ حجم فایل بیشتر از ۱۱ گیگابایت است.")
+                return
+            relative_path = file_path.absolute().relative_to(Path.cwd())
+            direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+            await msg.delete()
+            await update.message.reply_text(
+                f"✅ **دانلود کامل شد**\n\n"
+                f"📁 نام: `{file_name}`\n"
+                f"📦 حجم: `{file_size / 1024 / 1024:.1f} MB`\n\n"
+                f"🔗 **لینک دانلود:**\n`{direct_url}`",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 باز کردن لینک", url=direct_url)]])
+            )
+        except Exception as e:
+            await msg.edit_text(f"❌ خطا در دانلود:\n`{str(e)[:300]}`", parse_mode="Markdown")
         return
 
     # ── QR code ──
@@ -2231,9 +2511,9 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await file.download_to_drive(input_path)
                 # Ask for target format
                 keyboard = [
-                    [InlineKeyboardButton("JPEG", callback_data=f"conv_img_jpeg_{input_path}"),
-                     InlineKeyboardButton("PNG", callback_data=f"conv_img_png_{input_path}"),
-                     InlineKeyboardButton("WebP", callback_data=f"conv_img_webp_{input_path}")],
+                    [InlineKeyboardButton("JPEG", callback_data="conv_img_jpeg"),
+                     InlineKeyboardButton("PNG", callback_data="conv_img_png"),
+                     InlineKeyboardButton("WebP", callback_data="conv_img_webp")],
                     [InlineKeyboardButton("🔙 برگشت", callback_data="tools_convert")],
                 ]
                 await msg.edit_text("🖼 **انتخاب فرمت مقصد:**", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))

@@ -3,7 +3,8 @@ __pycache__/
 *.pyo
 venv/
 .env
-instagram_session
+data/instagram_session
+data/instagram_login.json
 cookies.txt
 downloads/
 bot_error.log
@@ -13,4 +14,3 @@ out.log
 restart.flag
 restart.ps1
 run.bat
-instagram_login.json
