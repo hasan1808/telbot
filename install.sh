@@ -50,23 +50,35 @@ source venv/bin/activate
 # ─── 3. Install Python packages ─────────────────────────────────────────
 echo "[3/6] نصب کتابخانه‌های Python..."
 pip install -q --upgrade pip
-pip install -q python-telegram-bot==22.8 yt-dlp instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg
+pip install -q python-telegram-bot==22.8 yt-dlp instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg requests jdatetime hijridate
 
-# ─── 4. Create config files ─────────────────────────────────────────────
-echo "[4/6] ایجاد فایل‌های پیکربندی..."
+# ─── 4. Create directories ──────────────────────────────────────────────
+echo "[4/7] ایجاد پوشه‌های مورد نیاز..."
 cd "$BOT_DIR"
+mkdir -p data downloads/admin_dl downloads/qrcodes downloads/photos downloads/instagram downloads/videos
 
-# Update bot.py with the token
+# ─── 5. Update bot.py with token ────────────────────────────────────────
+echo "[5/7] تنظیم توکن ربات..."
 if [ -f bot.py ]; then
-    sed -i "s/BOT_TOKEN = .*/BOT_TOKEN = \"$BOT_TOKEN\"/" bot.py
-    sed -i "s/HTTP_PORT = .*/HTTP_PORT = $HTTP_PORT/" bot.py
-    echo "  ✅ توکن و پورت در bot.py تنظیم شد."
+    sed -i "s/BOT_TOKEN = \".*\"/BOT_TOKEN = \"$BOT_TOKEN\"/" bot.py
+    echo "  ✅ توکن در bot.py تنظیم شد."
 else
-    echo "  ⚠️  فایل bot.py وجود ندارد. لطفاً دستی تنظیم کنید."
+    echo "  ⚠️  فایل bot.py وجود ندارد!"
+    exit 1
 fi
 
+# ─── 6. Create config files in data/ ────────────────────────────────────
+echo "[6/7] ایجاد فایل‌های پیکربندی..."
+
+# config.json
+cat > data/config.json <<EOF
+{
+  "http_port": $HTTP_PORT
+}
+EOF
+
 # admin.json
-cat > admin.json <<EOF
+cat > data/admin.json <<EOF
 {
   "admins": $ADMIN_IDS,
   "banned": []
@@ -74,40 +86,29 @@ cat > admin.json <<EOF
 EOF
 
 # users.json
-cat > users.json <<EOF
+cat > data/users.json <<EOF
 {"users": []}
 EOF
 
 # limits.json
-cat > limits.json <<EOF
+cat > data/limits.json <<EOF
 {}
-EOF
-
-# config.json
-cat > config.json <<EOF
-{
-  "bot_enabled": true,
-  "force_channel": "",
-  "welcome_message": "",
-  "file_expiry": 3600,
-  "max_upload": 2048,
-  "auto_delete": false,
-  "language": "fa",
-  "default_quality": "best",
-  "daily_limit": 10,
-  "port": $HTTP_PORT,
-  "base_url": "",
-  "new_user_notify": true
-}
 EOF
 
 # short_urls.json
-cat > short_urls.json <<EOF
+cat > data/short_urls.json <<EOF
 {}
 EOF
 
-# ─── 5. Create systemd service ──────────────────────────────────────────
-echo "[5/6] ایجاد سرویس systemd..."
+# instagram_login.json
+cat > data/instagram_login.json <<EOF
+{"username": "", "password": ""}
+EOF
+
+echo "  ✅ فایل‌های پیکربندی در data/ ایجاد شد."
+
+# ─── 7. Create systemd service ──────────────────────────────────────────
+echo "[7/7] ایجاد سرویس systemd..."
 SERVICE_FILE="/etc/systemd/system/telegram-bot.service"
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
@@ -131,8 +132,8 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable telegram-bot.service
 
-# ─── 6. Firewall ────────────────────────────────────────────────────────
-echo "[6/6] تنظیم فایروال..."
+# ─── Firewall ───────────────────────────────────────────────────────────
+echo "    تنظیم فایروال..."
 sudo ufw allow ${HTTP_PORT}/tcp 2>/dev/null || true
 
 echo ""
@@ -146,5 +147,9 @@ echo "  توقف:        sudo systemctl stop telegram-bot"
 echo "  لاگ:         sudo journalctl -u telegram-bot -f"
 echo ""
 echo "  پورت HTTP:   $HTTP_PORT"
-echo "  آپلود فایل:  http://YOUR_SERVER_IP:$HTTP_PORT/upload"
+echo "  آپلود فایل:  http://YOUR_SERVER_IP:$HTTP_PORT/"
+echo "  لینک مستقیم: http://YOUR_SERVER_IP:$HTTP_PORT/downloads/FILENAME"
+echo ""
+echo "  📌 بعد از نصب، حتماً در ربات /start رو بزنید"
+echo "     و پورت 8585 رو در فایروال سرور باز کنید."
 echo ""
