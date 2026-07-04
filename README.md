@@ -23,6 +23,11 @@
 ### نصب سریع
 
 ```bash
+# دانلود مخزن
+git clone https://github.com/hasan1808/telbot.git
+cd telbot
+
+# اجرای نصاب
 bash install.sh
 ```
 
