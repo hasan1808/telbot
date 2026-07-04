@@ -1,110 +1,109 @@
-# Telegram Multi-Purpose Bot
+# ربات چندمنظوره تلگرام
 
-A feature-rich Telegram bot with file hosting, media downloading, currency rates, calendar conversion, photo editing, and more.
+ربات تلگرام با قابلیت‌های آپلود فایل، دانلود از لینک، دریافت از یوتیوب/اینستاگرام/تیک‌تاک، نرخ ارز و طلا، تبدیل تاریخ، ویرایش عکس و...
 
-## Features
+## قابلیت‌ها
 
-- **File Hosting** — Upload files up to 50MB via Telegram or provide a direct download URL (admin: up to 11GB) and get a direct download link
-- **Media Downloader** — Download videos/audio from YouTube, Instagram, TikTok
-- **Currency Rates** — Live Iranian market rates from tgju.org (USD, EUR, GBP, AED, TRY, gold, crypto including TRX)
-- **Calendar Converter** — Convert between Shamsi (Jalali), Miladi (Gregorian), and Ghamari (Hijri) dates
-- **Photo Editing** — Resize, crop, convert format, compress, and remove background
-- **QR Code Generator** — Generate QR codes from text
-- **GSMArena Search** — Search phone specifications by model name or photo
-- **URL Shortener** — Shorten URLs with custom slugs
+- **📁 آپلود فایل و لینک مستقیم** — آپلود فایل تا ۵۰ مگ از طریق تلگرام یا دانلود از لینک (ادمین تا ۱۱ گیگ) و دریافت لینک دانلود مستقیم
+- **🎬 دانلود مدیا** — دانلود ویدیو/صوت از یوتیوب، اینستاگرام، تیک‌تاک
+- **💰 نرخ ارز و طلا** — نرخ‌های لحظه‌ای بازار ایران از tgju.org (دلار، یورو، پوند، درهم، لیر، طلا، سکه، تتر، بیت‌کوین، ترون)
+- **📅 تبدیل تاریخ** — تبدیل بین شمسی، میلادی و قمری
+- **🖼 ویرایش عکس** — تغییر اندازه، برش، تغییر فرمت، فشرده‌سازی و حذف پس‌زمینه
+- **📱 جستجوی گوشی** — مشخصات گوشی از GSMArena با اسم مدل یا عکس
+- **🔗 کوتاه‌کننده لینک** — کوتاه کردن لینک با اسم دلخواه
+- **🔳 QR کد** — ساخت QR کد از متن
 
-## Installation
+## نصب
 
-### Prerequisites
-- Linux server (Ubuntu/Debian recommended)
+### پیش‌نیازها
+- سرور لینوکس (Ubuntu/Debian پیشنهاد می‌شه)
 - Python 3.8+
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- توکن ربات از [@BotFather](https://t.me/BotFather)
 
-### Quick Install
+### نصب سریع
 
 ```bash
 bash install.sh
 ```
 
-The script will prompt for your bot token and admin ID. You can also pass them as arguments:
+اسکریپت توکن و آیدی ادمین رو می‌پرسه. می‌تونید به صورت آرگومان هم بدید:
 
 ```bash
 bash install.sh YOUR_BOT_TOKEN YOUR_ADMIN_ID [PORT] [DIRECTORY]
 ```
 
-What the installer does:
-1. Installs system packages (Python, ffmpeg, git, etc.)
-2. Creates a Python virtual environment
-3. Installs all required Python libraries
-4. Sets up `data/` config files
-5. Creates a systemd service for auto-start
-6. Opens the HTTP port in the firewall
+کارهایی که نصاب انجام می‌ده:
+1. نصب بسته‌های سیستمی (Python, ffmpeg, git, ...)
+2. ایجاد محیط مجازی Python
+3. نصب کتابخانه‌های مورد نیاز
+4. ایجاد فایل‌های پیکربندی در `data/`
+5. ایجاد سرویس systemd برای شروع خودکار
+6. باز کردن پورت HTTP در فایروال
 
-### Manual Install
+### نصب دستی
 
 ```bash
-# Clone the repo
+# کلون کردن مخزن
 git clone https://github.com/hasan1808/telbot.git
 cd telbot
 
-# Set up virtual environment
+# ایجاد محیط مجازی
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Edit bot.py and set your bot token
-# Create data/ directory with config files (see install.sh)
+# توکن ربات رو توی bot.py تنظیم کن
+# فایل‌های پیکربندی رو توی data/ بساز (install.sh رو ببین)
 ```
 
-## Configuration
+## تنظیمات
 
-All config files are stored in `data/`:
+همه فایل‌های تنظیمات در پوشه `data/` قرار دارن:
 
-| File | Purpose |
-|------|---------|
-| `config.json` | HTTP port, base URL |
-| `admin.json` | Admin IDs, banned users |
-| `users.json` | Registered users |
-| `limits.json` | Daily limits per user |
-| `short_urls.json` | URL shortening mappings |
-| `instagram_login.json` | Instagram session credentials |
+| فایل | توضیح |
+|------|-------|
+| `config.json` | پورت HTTP، آدرس بیس |
+| `admin.json` | آیدی ادمین‌ها، کاربران مسدود شده |
+| `users.json` | کاربران ثبت‌نام شده |
+| `limits.json` | محدودیت روزانه هر کاربر |
+| `short_urls.json` | نگاشت لینک‌های کوتاه |
+| `instagram_login.json` | اطلاعات ورود اینستاگرام |
 
-## Usage
+## استفاده
 
-Send `/start` to your bot on Telegram to see the main menu.
+برای دیدن منوی اصلی به ربات `/start` بفرستید.
 
-### Admin Features
-- Restart bot from settings panel
-- Download from URL (up to 11GB) via file host section
-- User management
-- Bot enable/disable toggle
+### قابلیت‌های ادمین
+- ری‌استارت ربات از پنل تنظیمات
+- دانلود از لینک (تا ۱۱ گیگ) از بخش آپلود فایل
+- مدیریت کاربران
+- فعال/غیرفعال کردن ربات
 
-## Commands & Callbacks
+## بخش‌های اصلی
 
-All interactions are handled via inline keyboards. Main sections:
-- 📁 **File Host** — Upload or URL download → direct link
-- 🎬 **Media Download** — YouTube, Instagram, TikTok
-- 🛠 **Tools** — Photo edit, QR code, URL shortener, calendar, currency, phone search
-- ⚙️ **Settings** — Admin panel
+- 📁 **آپلود فایل** — آپلود فایل یا دانلود از لینک → لینک مستقیم
+- 🎬 **دانلود مدیا** — یوتیوب، اینستاگرام، تیک‌تاک
+- 🛠 **ابزارها** — ویرایش عکس، QR کد، کوتاه‌کننده لینک، تبدیل تاریخ، نرخ ارز، جستجوی گوشی
+- ⚙️ **تنظیمات** — پنل ادمین
 
-## Direct Link HTTP Server
+## سرور HTTP لینک مستقیم
 
-The bot runs a built-in HTTP server on port 8585 that serves files from the working directory, providing direct download links for uploaded content.
+ربات یه سرور HTTP داخلی روی پورت ۸۵۸۵ راه‌اندازی می‌کنه که فایل‌ها رو از پوشه پروژه سرو می‌کنه تا لینک‌های دانلود مستقیم در دسترس باشه.
 
-## Dependencies
+## وابستگی‌ها
 
-- `python-telegram-bot` — Telegram Bot API
-- `yt-dlp` — YouTube/Instagram/TikTok downloads
-- `instaloader` — Instagram content
-- `beautifulsoup4` + `lxml` — Web scraping (tgju.org)
-- `Pillow` — Image processing
-- `rembg` — Background removal
-- `qrcode` — QR code generation
-- `jdatetime` — Jalali date conversion
-- `hijridate` — Hijri date conversion
-- `requests` — HTTP downloads
-- `cloudscraper` + `curl_cffi` — Cloudflare bypass
+- `python-telegram-bot` — ارتباط با API تلگرام
+- `yt-dlp` — دانلود از یوتیوب/اینستاگرام/تیک‌تاک
+- `instaloader` — دریافت محتوای اینستاگرام
+- `beautifulsoup4` + `lxml` — استخراج از سایت‌ها (tgju.org)
+- `Pillow` — پردازش تصویر
+- `rembg` — حذف پس‌زمینه
+- `qrcode` — ساخت QR کد
+- `jdatetime` — تبدیل تاریخ شمسی
+- `hijridate` — تبدیل تاریخ قمری
+- `requests` — دانلود HTTP
+- `cloudscraper` + `curl_cffi` — عبور از Cloudflare
 
-## License
+## مجوز
 
 MIT
