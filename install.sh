@@ -104,44 +104,26 @@ fi
 PY_FINAL=$($PYTHON --version 2>&1)
 echo "  Using: $PY_FINAL"
 
-# ─── 3. Deno runtime (for TikTok) ──────────────────────────────────────
-echo "[3/8] Installing Deno runtime..."
-if ! command -v deno &> /dev/null; then
-    curl -fsSL https://deno.land/install.sh | sh
-    export DENO_INSTALL="$HOME/.deno"
-    export PATH="$DENO_INSTALL/bin:$PATH"
-
-    # Add to PATH permanently
-    if ! grep -q 'DENO_INSTALL' ~/.bashrc 2>/dev/null; then
-        echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
-        echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
-    fi
-    echo "  Deno installed: $(deno --version 2>/dev/null | head -1 || echo 'unknown')"
-else
-    export DENO_INSTALL="$HOME/.deno"
-    export PATH="$DENO_INSTALL/bin:$PATH"
-    echo "  Deno already installed: $(deno --version 2>/dev/null | head -1 || echo 'unknown')"
-fi
-
-# ─── 4. Python virtual environment ──────────────────────────────────────
-echo "[4/8] Creating Python virtual environment..."
+# ─── 3. Python virtual environment ──────────────────────────────────────
+echo "[3/8] Creating Python virtual environment..."
 cd "$BOT_DIR"
 rm -rf venv
 $PYTHON -m venv venv
 source venv/bin/activate
 
-# ─── 5. Install Python packages ─────────────────────────────────────────
-echo "[5/8] Installing Python packages..."
+# ─── 4. Install Python packages ─────────────────────────────────────────
+echo "[4/8] Installing Python packages..."
 pip install -q --upgrade pip
-pip install -q python-telegram-bot==21.6 yt-dlp instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg requests jdatetime hijridate
+pip install -q python-telegram-bot==21.6 instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg requests jdatetime hijridate
+pip install -q --upgrade yt-dlp
 
-# ─── 6. Create directories ──────────────────────────────────────────────
-echo "[6/8] Creating required directories..."
+# ─── 5. Create directories ──────────────────────────────────────────────
+echo "[5/8] Creating required directories..."
 cd "$BOT_DIR"
 mkdir -p data downloads/admin_dl downloads/qrcodes downloads/photos downloads/instagram downloads/videos
 
-# ─── 7. Update bot.py with token ────────────────────────────────────────
-echo "[7/8] Setting bot token in bot.py..."
+# ─── 6. Update bot.py with token ────────────────────────────────────────
+echo "[6/8] Setting bot token in bot.py..."
 if [ -f bot.py ]; then
     sed -i "s/BOT_TOKEN = \".*\"/BOT_TOKEN = \"$BOT_TOKEN\"/" bot.py
     echo "  Done."
@@ -150,8 +132,8 @@ else
     exit 1
 fi
 
-# ─── 8. Create config files ─────────────────────────────────────────────
-echo "[8/8] Creating config files in data/..."
+# ─── 7. Create config files ─────────────────────────────────────────────
+echo "[7/8] Creating config files in data/..."
 
 cat > data/config.json <<EOF
 {
@@ -184,8 +166,8 @@ EOF
 
 echo "  Done."
 
-# ─── Systemd service ───────────────────────────────────────────────────
-echo "  Creating systemd service..."
+# ─── 8. Systemd service ─────────────────────────────────────────────────
+echo "[8/8] Creating systemd service..."
 SERVICE_FILE="/etc/systemd/system/telegram-bot.service"
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
@@ -201,7 +183,7 @@ Restart=always
 RestartSec=5
 Environment=HTTP_PORT=$HTTP_PORT
 Environment=SERVER_BASE_URL=
-Environment=PATH=$HOME/.deno/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
 
 [Install]
 WantedBy=multi-user.target
