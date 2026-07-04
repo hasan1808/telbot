@@ -524,7 +524,8 @@ def main_menu(uid=None):
 
 def settings_menu():
     keyboard = [
-        [InlineKeyboardButton("👥  مدیریت  👥", callback_data="settings_cat_management")],
+        [InlineKeyboardButton("👥  مدیریت کاربران  👥", callback_data="settings_cat_management")],
+        [InlineKeyboardButton("📂  مدیریت فایل‌ها  📂", callback_data="section_files")],
         [InlineKeyboardButton("🤖  تنظیمات ربات  🤖", callback_data="settings_cat_bot")],
         [InlineKeyboardButton("🔧  تنظیمات پیشرفته  🔧", callback_data="settings_advanced")],
         [InlineKeyboardButton("🔐  حساب‌ها  🔐", callback_data="settings_cat_accounts")],
