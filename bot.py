@@ -1948,39 +1948,104 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_filehost")]]))
             return
-        msg = await update.message.reply_text("⏳ در حال دانلود...")
-        try:
-            dl_dir = DOWNLOAD_DIR / "admin_dl" / str(uid)
-            dl_dir.mkdir(parents=True, exist_ok=True)
-            import urllib.request
-            file_name = url.split("/")[-1].split("?")[0] or f"file_{int(time.time())}"
-            file_path = dl_dir / file_name
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=300) as r:
+
+        import requests as req_lib
+        import concurrent.futures
+
+        dl_dir = DOWNLOAD_DIR / "admin_dl" / str(uid)
+        dl_dir.mkdir(parents=True, exist_ok=True)
+        file_name = url.split("/")[-1].split("?")[0] or f"file_{int(time.time())}"
+        file_path = dl_dir / file_name
+        msg = await update.message.reply_text("⏳ شروع دانلود...")
+
+        prog = {"downloaded": 0, "total": 0, "done": False, "error": None, "resumed": False}
+
+        def worker():
+            try:
+                resume_pos = 0
+                if file_path.exists():
+                    resume_pos = file_path.stat().st_size
+                hdrs = {"User-Agent": "Mozilla/5.0"}
+                if resume_pos > 0:
+                    hdrs["Range"] = f"bytes={resume_pos}-"
+                r = req_lib.get(url, headers=hdrs, stream=True, timeout=300, allow_redirects=True)
+                r.raise_for_status()
                 total = int(r.headers.get("Content-Length", 0))
+                if resume_pos > 0:
+                    if r.status_code == 206:
+                        total += resume_pos
+                        prog["resumed"] = True
+                    else:
+                        resume_pos = 0
+                        total += 0
+                prog["total"] = total
                 if total > MAX_TG_FILE:
-                    await msg.edit_text(f"❌ حجم فایل بیشتر از ۱۱ گیگابایت است.")
+                    prog["error"] = f"حجم فایل بیشتر از ۱۱ گیگابایت است ({total/1024/1024/1024:.1f}GB)"
+                    prog["done"] = True
                     return
-                with open(file_path, "wb") as f:
-                    shutil.copyfileobj(r, f)
-            file_size = file_path.stat().st_size
-            if file_size > MAX_TG_FILE:
-                file_path.unlink()
-                await msg.edit_text(f"❌ حجم فایل بیشتر از ۱۱ گیگابایت است.")
-                return
-            relative_path = file_path.absolute().relative_to(Path.cwd())
-            direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
-            await msg.delete()
-            await update.message.reply_text(
-                f"✅ **دانلود کامل شد**\n\n"
-                f"📁 نام: `{file_name}`\n"
-                f"📦 حجم: `{file_size / 1024 / 1024:.1f} MB`\n\n"
-                f"🔗 **لینک دانلود:**\n`{direct_url}`",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 باز کردن لینک", url=direct_url)]])
-            )
-        except Exception as e:
-            await msg.edit_text(f"❌ خطا در دانلود:\n`{str(e)[:300]}`", parse_mode="Markdown")
+                mode = "ab" if resume_pos > 0 and r.status_code == 206 else "wb"
+                if mode == "wb":
+                    resume_pos = 0
+                with open(file_path, mode) as f:
+                    for chunk in r.iter_content(chunk_size=262144):
+                        if chunk:
+                            f.write(chunk)
+                            prog["downloaded"] += len(chunk)
+                prog["done"] = True
+            except Exception as e:
+                prog["error"] = str(e)[:300]
+                prog["done"] = True
+
+        loop = asyncio.get_running_loop()
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = loop.run_in_executor(executor, worker)
+
+        last_pct = -1
+        while not prog["done"]:
+            await asyncio.sleep(2)
+            total = prog["total"]
+            downloaded = prog["downloaded"]
+            if total > 0:
+                pct = min(int(downloaded * 100 / total), 99)
+                if pct != last_pct:
+                    last_pct = pct
+                    dl_mb = downloaded / 1024 / 1024
+                    total_mb = total / 1024 / 1024
+                    bar = "▓" * (pct // 5) + "░" * (20 - pct // 5)
+                    try:
+                        await msg.edit_text(
+                            f"📥 **در حال دانلود...** `{pct}%`\n"
+                            f"`{bar}`\n"
+                            f"📦 `{dl_mb:.1f} MB / {total_mb:.1f} MB`"
+                        )
+                    except:
+                        pass
+
+        await future
+        if prog["error"]:
+            await msg.edit_text(f"❌ خطا: `{prog['error'][:200]}`",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_filehost")]]))
+            return
+
+        file_size = file_path.stat().st_size
+        if file_size > MAX_TG_FILE:
+            file_path.unlink()
+            await msg.edit_text("❌ حجم فایل بیشتر از ۱۱ گیگابایت است.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 برگشت", callback_data="section_filehost")]]))
+            return
+
+        try:
+            relative_path = file_path.resolve().relative_to(Path.cwd().resolve())
+        except ValueError:
+            relative_path = file_path.relative_to(Path.cwd())
+        direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+
+        await msg.delete()
+        txt = f"✅ **دانلود کامل شد**\n\n📁 نام: `{file_name}`\n📦 حجم: `{file_size / 1024 / 1024:.1f} MB`\n\n🔗 **لینک دانلود:**\n`{direct_url}`"
+        if prog["resumed"]:
+            txt = f"🔄 **ادامه دانلود از سر گرفته شد**\n\n{txt}"
+        await update.message.reply_text(txt, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 باز کردن لینک", url=direct_url)]]))
         return
 
     # ── QR code ──
