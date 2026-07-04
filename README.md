@@ -1,127 +1,110 @@
-# 🤖 Telegram Bot - ربات مدیریت دانلود و آپلود
+# Telegram Multi-Purpose Bot
 
-یک ربات تلگرام همه‌کاره با قابلیت‌های دانلود از شبکه‌های اجتماعی، آپلود فایل با لینک مستقیم، اطلاعات گوشی از GSMArena، ویرایش عکس و ابزارهای رسانه‌ای.
+A feature-rich Telegram bot with file hosting, media downloading, currency rates, calendar conversion, photo editing, and more.
 
-## ✨ قابلیت‌ها
+## Features
 
-### 📥 دانلود از شبکه‌های اجتماعی
-- **یوتیوب** - دانلود ویدیو با کیفیت دلخواه
-- **اینستاگرام** - دانلود پست و ریلز (نیاز به لاگین)
-- **تیک‌تاک** - دانلود ویدیو بدون واترمارک
+- **File Hosting** — Upload files up to 50MB via Telegram or provide a direct download URL (admin: up to 11GB) and get a direct download link
+- **Media Downloader** — Download videos/audio from YouTube, Instagram, TikTok
+- **Currency Rates** — Live Iranian market rates from tgju.org (USD, EUR, GBP, AED, TRY, gold, crypto including TRX)
+- **Calendar Converter** — Convert between Shamsi (Jalali), Miladi (Gregorian), and Ghamari (Hijri) dates
+- **Photo Editing** — Resize, crop, convert format, compress, and remove background
+- **QR Code Generator** — Generate QR codes from text
+- **GSMArena Search** — Search phone specifications by model name or photo
+- **URL Shortener** — Shorten URLs with custom slugs
 
-### 📦 آپلود فایل و لینک مستقیم
-- آپلود فایل تا ۵۰ مگابایت از طریق تلگرام
-- آپلود تا ۲ گیگابایت از طریق صفحه وب
-- لینک دانلود مستقیم با زمان انقضای قابل تنظیم
-- سرور HTTP اختصاصی
+## Installation
 
-### 📱 اطلاعات گوشی از GSMArena
-- جستجو با نام مدل یا کد مدل (مثل `SM-S928B`)
-- جستجو با عکس (تشخیص مدل گوشی از عکس)
-- نمایش مشخصات کامل با تصویر
+### Prerequisites
+- Linux server (Ubuntu/Debian recommended)
+- Python 3.8+
+- A Telegram bot token from [@BotFather](https://t.me/BotFather)
 
-### 🖼 ویرایش عکس
-- افزایش کیفیت عکس (آپ‌اسکال ۲ برابری)
-- حذف بکگراند عکس با هوش مصنوعی
-
-### 🧰 ابزارها
-- **تبدیل رسانه** - تبدیل فرمت عکس (JPEG/PNG/WebP)، ویدیو به GIF، استخراج صوت
-- **QR کد** - ساخت QR کد از متن و لینک
-- **کوتاه‌کننده لینک** - ساخت لینک کوتاه با ریدایرکت داخلی
-
-### ⚙️ مدیریت
-- پنل مدیریت کامل
-- تعیین محدودیت روزانه کاربران
-- عضویت اجباری کانال
-- پیام همگانی
-- پیام خوش‌آمدگویی دلخواه
-- بن و آنبن کاربران
-- آمار ربات
-
----
-
-## 🚀 نصب روی Ubuntu
+### Quick Install
 
 ```bash
-# ۱. کلون کردن مخزن
+bash install.sh
+```
+
+The script will prompt for your bot token and admin ID. You can also pass them as arguments:
+
+```bash
+bash install.sh YOUR_BOT_TOKEN YOUR_ADMIN_ID [PORT] [DIRECTORY]
+```
+
+What the installer does:
+1. Installs system packages (Python, ffmpeg, git, etc.)
+2. Creates a Python virtual environment
+3. Installs all required Python libraries
+4. Sets up `data/` config files
+5. Creates a systemd service for auto-start
+6. Opens the HTTP port in the firewall
+
+### Manual Install
+
+```bash
+# Clone the repo
 git clone https://github.com/hasan1808/telbot.git
 cd telbot
 
-# ۲. اجرای نصب‌کننده
-bash install.sh <BOT_TOKEN> <ADMIN_ID> [PORT] [DIRECTORY]
-
-# مثال:
-bash install.sh 123456:ABC-DEF1234gh 876139114 8585 /opt/bot
-
-# ۳. شروع ربات
-sudo systemctl start telegram-bot
-
-# ۴. مشاهده لاگ
-sudo journalctl -u telegram-bot -f
-```
-
-### پیش‌نیازها
-- Python 3.8+
-- ffmpeg (برای تبدیل رسانه)
-- ۱ گیگابایت رم (برای rembg)
-
----
-
-## ⚙️ تنظیمات
-
-### متغیرهای محیطی
-| متغیر | توضیح |
-|-------|--------|
-| `BOT_TOKEN` | توکن ربات تلگرام |
-| `HTTP_PORT` | پورت سرور HTTP (پیش‌فرض ۸۵۸۵) |
-| `SERVER_BASE_URL` | آدرس کامل سرور برای لینک‌های دانلود |
-
-### فایل‌های کانفیگ
-| فایل | توضیح |
-|------|--------|
-| `admin.json` | لیست ادمین‌ها و کاربران بن شده |
-| `config.json` | تنظیمات ربات (فعال/غیرفعال، کانال اجباری، ...) |
-| `users.json` | کاربران ثبت‌شده |
-| `limits.json` | آمار مصرف روزانه |
-
----
-
-## 🛠 کانفیگ دستی (بدون نصب‌کننده)
-
-```bash
-# ایجاد محیط مجازی
+# Set up virtual environment
 python3 -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt
 
-# نصب کتابخانه‌ها
-pip install python-telegram-bot==22.8 yt-dlp instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg
-
-# نصب ffmpeg
-sudo apt install ffmpeg -y
-
-# اجرا
-python bot.py
+# Edit bot.py and set your bot token
+# Create data/ directory with config files (see install.sh)
 ```
 
----
+## Configuration
 
-## 📸 اسکرین‌شات‌ها
+All config files are stored in `data/`:
 
-| منوی اصلی | اطلاعات گوشی | ابزارها |
-|-----------|-------------|---------|
-| ![menu](https://via.placeholder.com/200x400?text=Main+Menu) | ![gsm](https://via.placeholder.com/200x400?text=GSMArena) | ![tools](https://via.placeholder.com/200x400?text=Tools) |
+| File | Purpose |
+|------|---------|
+| `config.json` | HTTP port, base URL |
+| `admin.json` | Admin IDs, banned users |
+| `users.json` | Registered users |
+| `limits.json` | Daily limits per user |
+| `short_urls.json` | URL shortening mappings |
+| `instagram_login.json` | Instagram session credentials |
 
----
+## Usage
 
-## 📝 نکات مهم
+Send `/start` to your bot on Telegram to see the main menu.
 
-- **توکن ربات** در فایل `bot.py` به صورت متغیر محیطی تعریف شده. می‌تونی با `export BOT_TOKEN=...` مقداردهی کنی یا مستقیم توی فایل بزاری.
-- **حذف بکگراند** اولین بار نیاز به دانلود مدل هوش مصنوعی داره (حدود ۲۰۰ مگابایت).
-- **دانلود از اینستاگرام** نیاز به لاگین داره. با دستور `/iglogin <username> <password>` در ربات می‌تونی لاگین کنی.
-- **فایل‌های آپلود شده** بعد از مدت مشخص (پیش‌فرض ۱ ساعت) حذف می‌شن.
+### Admin Features
+- Restart bot from settings panel
+- Download from URL (up to 11GB) via file host section
+- User management
+- Bot enable/disable toggle
 
----
+## Commands & Callbacks
 
-## 📄 لایسنس
+All interactions are handled via inline keyboards. Main sections:
+- 📁 **File Host** — Upload or URL download → direct link
+- 🎬 **Media Download** — YouTube, Instagram, TikTok
+- 🛠 **Tools** — Photo edit, QR code, URL shortener, calendar, currency, phone search
+- ⚙️ **Settings** — Admin panel
+
+## Direct Link HTTP Server
+
+The bot runs a built-in HTTP server on port 8585 that serves files from the working directory, providing direct download links for uploaded content.
+
+## Dependencies
+
+- `python-telegram-bot` — Telegram Bot API
+- `yt-dlp` — YouTube/Instagram/TikTok downloads
+- `instaloader` — Instagram content
+- `beautifulsoup4` + `lxml` — Web scraping (tgju.org)
+- `Pillow` — Image processing
+- `rembg` — Background removal
+- `qrcode` — QR code generation
+- `jdatetime` — Jalali date conversion
+- `hijridate` — Hijri date conversion
+- `requests` — HTTP downloads
+- `cloudscraper` + `curl_cffi` — Cloudflare bypass
+
+## License
 
 MIT
