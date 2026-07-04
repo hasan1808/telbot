@@ -10,6 +10,7 @@ import threading
 import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest
@@ -237,12 +238,19 @@ def get_base_url():
     return f"http://{get_local_ip()}:{get_http_port()}"
 
 
+def make_direct_url(relative_path):
+    """Create a URL-safe download link from a relative Path object."""
+    parts = relative_path.as_posix().split("/")
+    encoded = "/".join(quote(p, safe="") for p in parts)
+    return f"{get_base_url()}/{encoded}"
+
+
 class FileUploadHandler(SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
     def translate_path(self, path):
-        return str(Path.cwd() / path.lstrip("/"))
+        return str(Path.cwd() / unquote(path.lstrip("/")))
 
     def do_GET(self):
         # Short URL redirect
@@ -326,7 +334,7 @@ button:hover{{background:#1557b0}}
                     f.write(file_data)
                 size_mb = len(file_data) / 1024 / 1024
                 relative_path = file_path.absolute().relative_to(Path.cwd())
-                direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+                direct_url = make_direct_url(relative_path)
 
                 result_html = f"""<!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -2038,7 +2046,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             relative_path = file_path.resolve().relative_to(Path.cwd().resolve())
         except ValueError:
             relative_path = file_path.relative_to(Path.cwd())
-        direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+        direct_url = make_direct_url(relative_path)
 
         await msg.delete()
         txt = f"✅ **دانلود کامل شد**\n\n📁 نام: `{file_name}`\n📦 حجم: `{file_size / 1024 / 1024:.1f} MB`\n\n🔗 **لینک دانلود:**\n`{direct_url}`"
@@ -2162,7 +2170,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Provide direct download link
             relative_path = filepath.absolute().relative_to(Path.cwd())
-            direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+            direct_url = make_direct_url(relative_path)
             await update.message.reply_text(
                 f"🔗 **لینک دانلود مستقیم:**\n`{direct_url}`\n\n"
                 f"⏰ این لینک تا {get_file_expiry() // 3600} ساعت معتبر است.",
@@ -2627,7 +2635,7 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         )
                 else:
                     relative_path = output_path.absolute().relative_to(Path.cwd())
-                    direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+                    direct_url = make_direct_url(relative_path)
                     await update.message.reply_text(f"🔗 لینک دانلود:\n`{direct_url}`\n⏰ معتبر تا {get_file_expiry() // 3600} ساعت.",
                         parse_mode="Markdown")
                 try:
@@ -2732,7 +2740,7 @@ async def handle_file_upload(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         # Generate direct link
         relative_path = file_path.absolute().relative_to(Path.cwd())
-        direct_url = f"{get_base_url()}/{relative_path.as_posix()}"
+        direct_url = make_direct_url(relative_path)
 
         await msg.edit_text(
             f"✅ **فایل آپلود شد**\n\n"
