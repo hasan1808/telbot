@@ -49,28 +49,57 @@ echo "============================================"
 echo ""
 
 # ─── 1. System packages ─────────────────────────────────────────────────
-echo "[1/7] Installing system packages..."
+echo "[1/8] Installing system packages..."
 sudo apt update -qq
-sudo apt install -y -qq python3 python3-pip python3-venv ffmpeg git curl wget
+sudo apt install -y -qq python3 python3-pip python3-venv ffmpeg git curl wget unzip
 
-# ─── 2. Python virtual environment ──────────────────────────────────────
-echo "[2/7] Creating Python virtual environment..."
+# ─── 1b. Check Python version (need 3.9+) ──────────────────────────────
+PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
+PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 9 ]; }; then
+    echo "  Python $PY_VER is too old. Installing Python 3.11..."
+    sudo apt install -y -qq software-properties-common
+    sudo add-apt-repository -y ppa:deadsnakes/ppa
+    sudo apt update -qq
+    sudo apt install -y -qq python3.11 python3.11-venv python3.11-distutils
+    PYTHON=python3.11
+else
+    echo "  Python $PY_VER is OK."
+    PYTHON=python3
+fi
+
+# ─── 2. Deno runtime (for TikTok downloads) ──────────────────────────────
+echo "[2/8] Installing Deno runtime..."
+if ! command -v deno &> /dev/null; then
+    curl -fsSL https://deno.land/install.sh | sh
+    echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
+    echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
+    export DENO_INSTALL="$HOME/.deno"
+    export PATH="$DENO_INSTALL/bin:$PATH"
+    echo "  Deno installed: $(deno --version | head -1)"
+else
+    echo "  Deno already installed: $(deno --version | head -1)"
+fi
+
+# ─── 3. Python virtual environment ──────────────────────────────────────
+echo "[3/8] Creating Python virtual environment..."
 cd "$BOT_DIR"
-python3 -m venv venv
+$PYTHON -m venv venv
 source venv/bin/activate
 
-# ─── 3. Install Python packages ─────────────────────────────────────────
-echo "[3/7] Installing Python packages..."
+# ─── 4. Install Python packages ─────────────────────────────────────────
+echo "[4/8] Installing Python packages..."
 pip install -q --upgrade pip
-pip install -q python-telegram-bot==22.8 yt-dlp instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg requests jdatetime hijridate
+pip install -q python-telegram-bot==21.6 yt-dlp instaloader cloudscraper curl_cffi beautifulsoup4 lxml Pillow qrcode[pil] rembg requests jdatetime hijridate
 
-# ─── 4. Create directories ──────────────────────────────────────────────
-echo "[4/7] Creating required directories..."
+# ─── 5. Create directories ──────────────────────────────────────────────
+echo "[5/8] Creating required directories..."
 cd "$BOT_DIR"
 mkdir -p data downloads/admin_dl downloads/qrcodes downloads/photos downloads/instagram downloads/videos
 
-# ─── 5. Update bot.py with token ────────────────────────────────────────
-echo "[5/7] Setting bot token in bot.py..."
+# ─── 6. Update bot.py with token ────────────────────────────────────────
+echo "[6/8] Setting bot token in bot.py..."
 if [ -f bot.py ]; then
     sed -i "s/BOT_TOKEN = \".*\"/BOT_TOKEN = \"$BOT_TOKEN\"/" bot.py
     echo "  Done."
@@ -79,8 +108,8 @@ else
     exit 1
 fi
 
-# ─── 6. Create config files in data/ ────────────────────────────────────
-echo "[6/7] Creating config files in data/..."
+# ─── 7. Create config files in data/ ────────────────────────────────────
+echo "[7/8] Creating config files in data/..."
 
 cat > data/config.json <<EOF
 {
@@ -113,8 +142,8 @@ EOF
 
 echo "  Done."
 
-# ─── 7. Create systemd service ──────────────────────────────────────────
-echo "[7/7] Creating systemd service..."
+# ─── 8. Create systemd service ──────────────────────────────────────────
+echo "[8/8] Creating systemd service..."
 SERVICE_FILE="/etc/systemd/system/telegram-bot.service"
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
