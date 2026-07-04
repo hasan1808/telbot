@@ -1676,7 +1676,6 @@ def download_video(url, output_dir, platform=None):
         "--no-playlist",
         "--no-warnings",
         "--print", "after_move:filepath",
-        "--js-runtimes", "deno",
         "-o", output_template,
     ]
     # Cookies handling for Instagram
