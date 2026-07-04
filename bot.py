@@ -1669,27 +1669,16 @@ def download_video(url, output_dir, platform=None):
     quality = get_default_quality()
     quality_format = {"best": "best[filesize<50M]/best", "1080": "bestvideo[height<=1080][filesize<45M]+bestaudio/best[height<=1080][filesize<50M]/best", "720": "bestvideo[height<=720][filesize<45M]+bestaudio/best[height<=720][filesize<50M]/best", "480": "bestvideo[height<=480][filesize<45M]+bestaudio/best[height<=480][filesize<50M]/best"}
     format_str = quality_format.get(quality, "best[filesize<50M]/best")
-    ytdlp_cmd = shutil.which("yt-dlp") or sys.executable
-    if ytdlp_cmd == sys.executable:
-        cmd = [
-            ytdlp_cmd, "-m", "yt_dlp",
-            "-f", format_str,
-            "--merge-output-format", "mp4",
-            "--no-playlist",
-            "--no-warnings",
-            "--print", "after_move:filepath",
-            "-o", output_template,
-        ]
-    else:
-        cmd = [
-            ytdlp_cmd,
-            "-f", format_str,
-            "--merge-output-format", "mp4",
-            "--no-playlist",
-            "--no-warnings",
-            "--print", "after_move:filepath",
-            "-o", output_template,
-        ]
+    cmd = [
+        "yt-dlp",
+        "-f", format_str,
+        "--merge-output-format", "mp4",
+        "--no-playlist",
+        "--no-warnings",
+        "--print", "after_move:filepath",
+        "--js-runtimes", "deno",
+        "-o", output_template,
+    ]
     # Cookies handling for Instagram
     if platform == "instagram":
         if COOKIES_FILE.exists():
